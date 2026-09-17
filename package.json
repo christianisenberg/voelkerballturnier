@@ -1,0 +1,1 @@
+{"name":"voelkerballturnier","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.js","start":"node tools/serve.js","build":"node tools/build.js && node tools/sync.js","prepare:edge":"node tools/sync.js"},"engines":{"node":">=22.13"}}

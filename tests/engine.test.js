@@ -1,0 +1,29 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {TEAMS,PAIRS,SCHEDULE,emptyState,validateScore,outcome,lives,standings,fixtures,applyResult,applyLot} from '../docs/engine.js';
+const win={ra:4,ca:3,rb:0,cb:0},draw={ra:4,ca:3,rb:3,cb:2};
+function complete(){let s=emptyState();for(const m of SCHEDULE){const aWins=m.a<m.b;s=applyResult(s,m.id,aWins?win:{ra:0,ca:0,rb:4,cb:3}).state;}return s;}
+test('21 einzigartige Paarungen; jedes Team sechs Spiele; keine Direktfolge',()=>{
+  assert.equal(SCHEDULE.length,21);assert.equal(new Set(PAIRS.map(p=>[...p].sort().join('-'))).size,21);
+  for(let t=0;t<7;t++){const indices=PAIRS.flatMap((p,i)=>p.includes(t)?[i]:[]);assert.equal(indices.length,6);for(let j=1;j<6;j++)assert.ok(indices[j]-indices[j-1]>=2);}
+  assert.equal(SCHEDULE[0].time,'18:30');assert.equal(SCHEDULE[20].time,'21:50');
+});
+test('7:5 wird unabhängig von Lebenszahlen unentschieden',()=>{assert.equal(outcome(draw),'draw');assert.deepEqual(lives(draw),[7,5]);const s=applyResult(emptyState(),'g1',draw).state;const r=standings(s).rows;assert.equal(r.find(x=>x.id===0).pts,1);assert.equal(r.find(x=>x.id===4).pts,1);});
+test('Kapitän entscheidet selbst bei mehr regulären Spielern des Verlierers',()=>{const r=validateScore({ra:9,ca:0,rb:0,cb:1});assert.equal(outcome(r),'b');assert.deepEqual(lives(r),[9,1]);});
+test('Sieg gibt zwei, Niederlage null Punkte',()=>{const s=applyResult(emptyState(),'g1',win).state;assert.equal(standings(s).rows.find(x=>x.id===0).pts,2);assert.equal(standings(s).rows.find(x=>x.id===4).pts,0);});
+test('unzulässige Werte und zwei tote Kapitäne werden verworfen',()=>{for(const r of [{...win,ra:-1},{...win,ca:4},{...win,ra:1.5},{...win,ra:'1'},{...win,ca:0},{...win,ra:NaN},{...win,ra:Infinity},null])assert.throws(()=>validateScore(r));});
+test('keine Obergrenze anhand der Mannschaftsstärke und keine kombinierte Plausibilität',()=>{assert.deepEqual(validateScore({ra:27,ca:1,rb:19,cb:2}),{ra:27,ca:1,rb:19,cb:2});});
+test('KO-Unentschieden verweigert',()=>assert.throws(()=>validateScore(draw,true)));
+test('Halbfinals erst nach allen Vorrundenspielen',()=>{const s=complete();delete s.results.g21;assert.equal(fixtures(s)[21].a,null);assert.throws(()=>applyResult(s,'s1',win));});
+test('Halbfinals 1 gegen 4 und 2 gegen 3, Finale aus Siegern',()=>{let s=complete();let f=fixtures(s);assert.deepEqual([f[21].a,f[21].b,f[22].a,f[22].b],[0,3,1,2]);s=applyResult(s,'s1',win).state;assert.equal(fixtures(s)[23].a,0);assert.equal(fixtures(s)[23].b,null);s=applyResult(s,'s2',{ra:0,ca:0,rb:2,cb:1}).state;assert.deepEqual([fixtures(s)[23].a,fixtures(s)[23].b],[0,2]);assert.throws(()=>applyResult(s,'f',draw));});
+test('Vorrundenkorrektur ändert keine Statistik doppelt',()=>{let s=applyResult(emptyState(),'g1',win).state;s=applyResult(s,'g1',draw).state;const r=standings(s).rows.find(r=>r.id===0);assert.equal(r.played,1);assert.equal(r.pts,1);assert.equal(r.for,7);assert.equal(r.against,5);});
+test('Korrektur des Halbfinalsiegers löscht bestehendes Finale',()=>{let s=complete();s=applyResult(s,'s1',win).state;s=applyResult(s,'s2',win).state;s=applyResult(s,'f',win).state;const changed=applyResult(s,'s1',{ra:0,ca:0,rb:1,cb:1});assert.deepEqual(changed.cleared,['f']);assert.equal(changed.state.results.f,undefined);assert.equal(fixtures(changed.state)[23].a,3);});
+test('Korrektur ohne Teilnehmerwechsel bewahrt Finale',()=>{let s=complete();for(const k of ['s1','s2','f'])s=applyResult(s,k,win).state;const changed=applyResult(s,'s1',{...win,ra:2});assert.deepEqual(changed.cleared,[]);assert.ok(changed.state.results.f);});
+test('Vorrundenkorrektur invalidiert betroffene Halbfinals und Finale',()=>{let s=complete();for(const k of ['s1','s2','f'])s=applyResult(s,k,win).state;const m=SCHEDULE.find(m=>[m.a,m.b].includes(3)&&[m.a,m.b].includes(4));const changed=applyResult(s,m.id,m.a===4?win:{ra:0,ca:0,rb:4,cb:3});assert.ok(changed.cleared.includes('s1'));assert.ok(changed.cleared.includes('f'));assert.ok(changed.state.results.s2);});
+test('vollständiger Gleichstand blockiert Setzung bis Losentscheidung',()=>{let s=emptyState();for(const m of SCHEDULE)s=applyResult(s,m.id,{ra:0,ca:3,rb:0,cb:3}).state;assert.ok(standings(s).needsLot);assert.equal(fixtures(s)[21].a,null);s=applyLot(s,[6,5,4,3,2,1,0]);assert.equal(fixtures(s)[21].a,6);assert.equal(fixtures(s)[21].b,3);assert.throws(()=>applyLot(s,[0,1,2,3,4,5,6]));});
+test('Los beeinflusst niemals sportlich unterschiedliche Ränge',()=>{const s=complete();s.lot=[6,5,4,3,2,1,0];assert.deepEqual(standings(s).rows.map(r=>r.id),[0,1,2,3,4,5,6]);});
+test('Direkter Vergleich vor globaler Lebensdifferenz',()=>{const s=emptyState();const set=(a,b,r)=>{const m=SCHEDULE.find(m=>m.a===a&&m.b===b||m.a===b&&m.b===a);s.results[m.id]=m.a===a?r:{ra:r.rb,ca:r.cb,rb:r.ra,cb:r.ca};};set(0,1,{ra:0,ca:1,rb:0,cb:0});set(1,2,{ra:20,ca:3,rb:0,cb:0});const rows=standings(s).rows;assert.equal(rows[0].id,0);assert.equal(rows[1].id,1);assert.ok(rows[0].diff<rows[1].diff);});
+test('Dreiervergleich ist zyklusfrei über Mini-Tabelle',()=>{const s=emptyState();for(const [a,b] of [[0,1],[1,2],[2,0]]){const m=SCHEDULE.find(m=>[m.a,m.b].includes(a)&&[m.a,m.b].includes(b));s.results[m.id]=m.a===a?win:{ra:0,ca:0,rb:4,cb:3};}const t=standings(s);assert.ok(t.rows.slice(0,3).every(r=>r.h2h===2));assert.ok(t.ties.some(g=>g.length===3&&g.includes(0)));});
+test('Unbekannte Spiel-ID verweigert und ursprünglicher Zustand unverändert',()=>{const s=emptyState();assert.throws(()=>applyResult(s,'x',win));applyResult(s,'g1',win);assert.deepEqual(s,emptyState());});
+test('Browser und Server verwenden exakt dieselben Regeln',async()=>{assert.equal(await readFile(new URL('../docs/engine.js',import.meta.url),'utf8'),await readFile(new URL('../supabase/functions/_shared/engine.js',import.meta.url),'utf8'));});

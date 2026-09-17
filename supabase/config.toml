@@ -1,0 +1,4 @@
+project_id = "voelkerballturnier"
+
+[functions.tournament]
+verify_jwt = false
