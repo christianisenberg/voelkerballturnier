@@ -2,7 +2,7 @@
 (()=>{
 "use strict";
 // Diese Regeln laufen identisch im Browser und in der geschützten Edge Function.
-const TEAMS = ['Physiker','Alfeld II','A - Team','Gymhim','Ersatzbank','Bushido','GymAlf'];
+const TEAMS = ['Physiker','Thunder 40','A - Team','GymHim','purple pain','Bushido','GymAlf'];
 const PAIRS = [[0,4],[1,3],[6,5],[2,4],[0,3],[1,6],[2,5],[3,4],[0,6],[1,5],[2,3],[4,5],[2,6],[0,1],[3,5],[4,6],[1,2],[0,5],[3,6],[1,4],[0,2]];
 function time(i) { const m=18*60+30+i*10; return `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`; }
 const SCHEDULE = PAIRS.map(([a,b],i)=>({id:`g${i+1}`,a,b,time:time(i),stage:'group'}));
