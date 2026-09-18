@@ -1,5 +1,5 @@
 // Diese Regeln laufen identisch im Browser und in der geschützten Edge Function.
-export const TEAMS = ['Physiker','Alfeld II','A - Team','Gymhim','Ersatzbank','Bushido','GymAlf'];
+export const TEAMS = ['Physiker','Thunder 40','A - Team','GymHim','purple pain','Bushido','GymAlf'];
 export const PAIRS = [[0,4],[1,3],[6,5],[2,4],[0,3],[1,6],[2,5],[3,4],[0,6],[1,5],[2,3],[4,5],[2,6],[0,1],[3,5],[4,6],[1,2],[0,5],[3,6],[1,4],[0,2]];
 export function time(i) { const m=18*60+30+i*10; return `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`; }
 export const SCHEDULE = PAIRS.map(([a,b],i)=>({id:`g${i+1}`,a,b,time:time(i),stage:'group'}));
